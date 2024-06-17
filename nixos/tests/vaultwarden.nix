@@ -32,40 +32,41 @@ let
 
     nodes = {
       server = { pkgs, ... }:
-        let backendConfig = {
-          mysql = {
-            services.mysql = {
-              enable = true;
-              initialScript = pkgs.writeText "mysql-init.sql" ''
-                CREATE DATABASE bitwarden;
-                CREATE USER 'bitwardenuser'@'localhost' IDENTIFIED BY '${dbPassword}';
-                GRANT ALL ON `bitwarden`.* TO 'bitwardenuser'@'localhost';
-                FLUSH PRIVILEGES;
-              '';
-              package = pkgs.mariadb;
+        let
+          backendConfig = {
+            mysql = {
+              services.mysql = {
+                enable = true;
+                initialScript = pkgs.writeText "mysql-init.sql" ''
+                  CREATE DATABASE bitwarden;
+                  CREATE USER 'bitwardenuser'@'localhost' IDENTIFIED BY '${dbPassword}';
+                  GRANT ALL ON `bitwarden`.* TO 'bitwardenuser'@'localhost';
+                  FLUSH PRIVILEGES;
+                '';
+                package = pkgs.mariadb;
+              };
+
+              services.vaultwarden.config.databaseUrl = "mysql://bitwardenuser:${dbPassword}@localhost/bitwarden";
+
+              systemd.services.vaultwarden.after = [ "mysql.service" ];
             };
 
-            services.vaultwarden.config.databaseUrl = "mysql://bitwardenuser:${dbPassword}@localhost/bitwarden";
+            postgresql = {
+              services.postgresql = {
+                enable = true;
+                initialScript = pkgs.writeText "postgresql-init.sql" ''
+                  CREATE USER bitwardenuser WITH PASSWORD '${dbPassword}';
+                  CREATE DATABASE bitwarden WITH OWNER bitwardenuser;
+                '';
+              };
 
-            systemd.services.vaultwarden.after = [ "mysql.service" ];
-          };
+              services.vaultwarden.config.databaseUrl = "postgresql://bitwardenuser:${dbPassword}@localhost/bitwarden";
 
-          postgresql = {
-            services.postgresql = {
-              enable = true;
-              initialScript = pkgs.writeText "postgresql-init.sql" ''
-                CREATE USER bitwardenuser WITH PASSWORD '${dbPassword}';
-                CREATE DATABASE bitwarden WITH OWNER bitwardenuser;
-              '';
+              systemd.services.vaultwarden.after = [ "postgresql.service" ];
             };
 
-            services.vaultwarden.config.databaseUrl = "postgresql://bitwardenuser:${dbPassword}@localhost/bitwarden";
-
-            systemd.services.vaultwarden.after = [ "postgresql.service" ];
+            sqlite = { };
           };
-
-          sqlite = { };
-        };
         in
         mkMerge [
           backendConfig.${backend}
@@ -74,7 +75,7 @@ let
               enable = true;
               dbBackend = backend;
               config = {
-                rocketAddress = "0.0.0.0";
+                rocketAddress = "::";
                 rocketPort = 80;
               };
             };
