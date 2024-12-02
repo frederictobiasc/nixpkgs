@@ -175,25 +175,25 @@ in
     publish = {
       enable = lib.mkOption {
         type = lib.types.bool;
-        default = false;
+        default = true;
         description = "Whether to allow publishing in general.";
       };
 
       userServices = lib.mkOption {
         type = lib.types.bool;
-        default = false;
+        default = true;
         description = "Whether to publish user services. Will set `addresses=true`.";
       };
 
       addresses = lib.mkOption {
         type = lib.types.bool;
-        default = false;
+        default = true;
         description = "Whether to register mDNS address records for all local IP addresses.";
       };
 
       hinfo = lib.mkOption {
         type = lib.types.bool;
-        default = false;
+        default = true;
         description = ''
           Whether to register a mDNS HINFO record which contains information about the
           local operating system and CPU.
@@ -202,7 +202,7 @@ in
 
       workstation = lib.mkOption {
         type = lib.types.bool;
-        default = false;
+        default = true;
         description = ''
           Whether to register a service of type "_workstation._tcp" on the local LAN.
         '';
@@ -210,14 +210,14 @@ in
 
       domain = lib.mkOption {
         type = lib.types.bool;
-        default = false;
+        default = true;
         description = "Whether to announce the locally used domain name for browsing by other hosts.";
       };
     };
 
     nssmdns4 = lib.mkOption {
       type = lib.types.bool;
-      default = false;
+      default = true;
       description = ''
         Whether to enable the mDNS NSS (Name Service Switch) plug-in for IPv4.
         Enabling it allows applications to resolve names in the `.local`
