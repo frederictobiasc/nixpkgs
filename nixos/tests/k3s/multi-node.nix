@@ -54,18 +54,85 @@ import ../make-test-python.nix (
               command: ["socat", "TCP4-LISTEN:8000,fork", "EXEC:echo server"]
     '';
     tokenFile = pkgs.writeText "token" "p@s$w0rd";
+    systemPackages = with pkgs; [
+      busybox
+      traceroute
+      jq
+      iptables
+      tcpdump
+    ];
   in
   {
     name = "${k3s.name}-multi-node";
 
+    interactive.nodes.server = {
+      services.openssh = {
+        enable = true;
+        settings = {
+          PermitRootLogin = "yes";
+          PermitEmptyPasswords = "yes";
+        };
+      };
+
+      security.pam.services.sshd.allowNullPassword = true;
+
+      virtualisation.forwardPorts = [
+        {
+          from = "host";
+          host.port = 2000;
+          guest.port = 22;
+        }
+      ];
+    };
+    interactive.nodes.server2 = {
+      services.openssh = {
+        enable = true;
+        settings = {
+          PermitRootLogin = "yes";
+          PermitEmptyPasswords = "yes";
+        };
+      };
+
+      security.pam.services.sshd.allowNullPassword = true;
+
+      virtualisation.forwardPorts = [
+        {
+          from = "host";
+          host.port = 2002;
+          guest.port = 22;
+        }
+      ];
+    };
+    interactive.nodes.agent = {
+      services.openssh = {
+        enable = true;
+        settings = {
+          PermitRootLogin = "yes";
+          PermitEmptyPasswords = "yes";
+        };
+      };
+
+      security.pam.services.sshd.allowNullPassword = true;
+
+      virtualisation.forwardPorts = [
+        {
+          from = "host";
+          host.port = 2001;
+          guest.port = 22;
+        }
+      ];
+    };
+
+    skipTypeCheck = true;
+    skipLint = true;
     nodes = {
       server =
-        { pkgs, ... }:
+        { nodes, pkgs, ... }:
         {
           environment.systemPackages = with pkgs; [
             gzip
             jq
-          ];
+          ] ++ systemPackages;
           # k3s uses enough resources the default vm fails.
           virtualisation.memorySize = 1536;
           virtualisation.diskSize = 4096;
@@ -83,10 +150,15 @@ import ../make-test-python.nix (
               "--disable metrics-server"
               "--disable servicelb"
               "--disable traefik"
-              "--node-ip 192.168.1.1"
+              # "--node-ip 192.168.1.1"
               "--pause-image test.local/pause:local"
+              "--node-ip ${nodes.server.networking.primaryIPAddress}"
+              "--node-external-ip ${nodes.server.networking.primaryIPAddress}"
+              "--advertise-address ${nodes.server.networking.primaryIPAddress}"
+              # "--flannel-backend=wireguard-native"
             ];
           };
+          networking.firewall.enable = false;
           networking.firewall.allowedTCPPorts = [
             2379
             2380
@@ -95,22 +167,22 @@ import ../make-test-python.nix (
           networking.firewall.allowedUDPPorts = [ 8472 ];
           networking.firewall.trustedInterfaces = [ "flannel.1" ];
           networking.useDHCP = false;
-          networking.defaultGateway = "192.168.1.1";
-          networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
-            {
-              address = "192.168.1.1";
-              prefixLength = 24;
-            }
-          ];
+          # networking.defaultGateway = "192.168.1.1";
+          # networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
+          #   {
+          #     address = "192.168.1.1";
+          #     prefixLength = 24;
+          #   }
+          # ];
         };
 
       server2 =
-        { pkgs, ... }:
+        { nodes, pkgs, ... }:
         {
           environment.systemPackages = with pkgs; [
             gzip
             jq
-          ];
+          ] ++ systemPackages;
           virtualisation.memorySize = 1536;
           virtualisation.diskSize = 4096;
 
@@ -119,7 +191,8 @@ import ../make-test-python.nix (
             enable = true;
             package = k3s;
             images = [ pauseImage ];
-            serverAddr = "https://192.168.1.1:6443";
+            serverAddr = "https://${nodes.server.networking.primaryIPAddress}:6443";
+            # serverAddr = "https://192.168.1.1:6443";
             clusterInit = false;
             extraFlags = [
               "--disable coredns"
@@ -127,10 +200,14 @@ import ../make-test-python.nix (
               "--disable metrics-server"
               "--disable servicelb"
               "--disable traefik"
-              "--node-ip 192.168.1.3"
+              # "--node-ip 192.168.1.3"
               "--pause-image test.local/pause:local"
+              "--node-ip ${nodes.server2.networking.primaryIPAddress}"
+              "--node-external-ip ${nodes.server2.networking.primaryIPAddress}"
+              # "--flannel-backend=wireguard-native"
             ];
           };
+          networking.firewall.enable = false;
           networking.firewall.allowedTCPPorts = [
             2379
             2380
@@ -138,19 +215,21 @@ import ../make-test-python.nix (
           ];
           networking.firewall.allowedUDPPorts = [ 8472 ];
           networking.firewall.trustedInterfaces = [ "flannel.1" ];
+          networking.dhcpcd.allowInterfaces = ["eth0"];
           networking.useDHCP = false;
-          networking.defaultGateway = "192.168.1.3";
-          networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
-            {
-              address = "192.168.1.3";
-              prefixLength = 24;
-            }
-          ];
+          # networking.defaultGateway = "192.168.1.3";
+          # networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
+          #   {
+          #     address = "192.168.1.3";
+          #     prefixLength = 24;
+          #   }
+          # ];
         };
 
       agent =
-        { pkgs, ... }:
+        { nodes, pkgs, ... }:
         {
+          environment.systemPackages = systemPackages;
           virtualisation.memorySize = 1024;
           virtualisation.diskSize = 2048;
           services.k3s = {
@@ -159,23 +238,27 @@ import ../make-test-python.nix (
             role = "agent";
             package = k3s;
             images = [ pauseImage ];
-            serverAddr = "https://192.168.1.3:6443";
+            serverAddr = "https://${nodes.server2.networking.primaryIPAddress}:6443";
+            # serverAddr = "https://192.168.1.3:6443";
             extraFlags = [
               "--pause-image test.local/pause:local"
-              "--node-ip 192.168.1.2"
+              "--node-ip ${nodes.agent.networking.primaryIPAddress}"
+              "--node-external-ip ${nodes.agent.networking.primaryIPAddress}"
+              # "--node-ip 192.168.1.2"
             ];
           };
+          networking.firewall.enable = false;
           networking.firewall.allowedTCPPorts = [ 6443 ];
           networking.firewall.allowedUDPPorts = [ 8472 ];
           networking.firewall.trustedInterfaces = [ "flannel.1" ];
           networking.useDHCP = false;
-          networking.defaultGateway = "192.168.1.2";
-          networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
-            {
-              address = "192.168.1.2";
-              prefixLength = 24;
-            }
-          ];
+          # networking.defaultGateway = "192.168.1.2";
+          # networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
+          #   {
+          #     address = "192.168.1.2";
+          #     prefixLength = 24;
+          #   }
+          # ];
         };
     };
 
