@@ -129,10 +129,13 @@ import ../make-test-python.nix (
       server =
         { nodes, pkgs, ... }:
         {
-          environment.systemPackages = with pkgs; [
-            gzip
-            jq
-          ] ++ systemPackages;
+          environment.systemPackages =
+            with pkgs;
+            [
+              gzip
+              jq
+            ]
+            ++ systemPackages;
           # k3s uses enough resources the default vm fails.
           virtualisation.memorySize = 1536;
           virtualisation.diskSize = 4096;
@@ -166,7 +169,25 @@ import ../make-test-python.nix (
           ];
           networking.firewall.allowedUDPPorts = [ 8472 ];
           networking.firewall.trustedInterfaces = [ "flannel.1" ];
-          networking.useDHCP = false;
+          #networking.useDHCP = false;
+          networking = {
+            interfaces."eth1" = {
+              ipv4.routes = [
+                {
+                  address = "0.0.0.0";
+                  prefixLength = 0;
+                  via = "192.168.1.254";
+                }
+              ];
+              ipv6.routes = [
+                {
+                  address = "::";
+                  prefixLength = 0;
+                  via = "2001:db8:1::fffe";
+                }
+              ];
+            };
+          };
           # networking.defaultGateway = "192.168.1.1";
           # networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
           #   {
@@ -179,10 +200,13 @@ import ../make-test-python.nix (
       server2 =
         { nodes, pkgs, ... }:
         {
-          environment.systemPackages = with pkgs; [
-            gzip
-            jq
-          ] ++ systemPackages;
+          environment.systemPackages =
+            with pkgs;
+            [
+              gzip
+              jq
+            ]
+            ++ systemPackages;
           virtualisation.memorySize = 1536;
           virtualisation.diskSize = 4096;
 
@@ -215,8 +239,26 @@ import ../make-test-python.nix (
           ];
           networking.firewall.allowedUDPPorts = [ 8472 ];
           networking.firewall.trustedInterfaces = [ "flannel.1" ];
-          networking.dhcpcd.allowInterfaces = ["eth0"];
-          networking.useDHCP = false;
+          #networking.dhcpcd.allowInterfaces = [ "eth0" ];
+          #networking.useDHCP = false;
+          networking = {
+            interfaces."eth1" = {
+              ipv4.routes = [
+                {
+                  address = "0.0.0.0";
+                  prefixLength = 0;
+                  via = "192.168.1.254";
+                }
+              ];
+              ipv6.routes = [
+                {
+                  address = "::";
+                  prefixLength = 0;
+                  via = "2001:db8:1::fffe";
+                }
+              ];
+            };
+          };
           # networking.defaultGateway = "192.168.1.3";
           # networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
           #   {
@@ -251,7 +293,26 @@ import ../make-test-python.nix (
           networking.firewall.allowedTCPPorts = [ 6443 ];
           networking.firewall.allowedUDPPorts = [ 8472 ];
           networking.firewall.trustedInterfaces = [ "flannel.1" ];
-          networking.useDHCP = false;
+          #networking.useDHCP = false;
+          networking = {
+            interfaces."eth1" = {
+              ipv4.routes = [
+                {
+                  address = "0.0.0.0";
+                  prefixLength = 0;
+                  via = "192.168.1.254";
+                }
+              ];
+              ipv6.routes = [
+                {
+                  address = "::";
+                  prefixLength = 0;
+                  via = "2001:db8:1::fffe";
+                }
+              ];
+            };
+          };
+
           # networking.defaultGateway = "192.168.1.2";
           # networking.interfaces.eth1.ipv4.addresses = pkgs.lib.mkForce [
           #   {
